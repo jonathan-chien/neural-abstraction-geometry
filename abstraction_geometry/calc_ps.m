@@ -285,23 +285,3 @@ ps.obsStdev = get_num_stdev(parScore, nullParScore);
 end
 
 end
-
-% function CxN = calculate_centroids(TxN, nConds)
-% % Calculate condition cluster centroids by averaging across all trials
-% % within each condition. Input is nTrials x nNeurons matrix of firing
-% % rates, returns nConds x nNeurons of firing rates (corresponding to
-% % cluster centroids).
-% 
-% % Determine number of neurons, trials, and trials per condition.
-% [nTrials, nNeurons] = size(TxN);
-% nTrialsPerCond = nTrials / nConds;
-% assert(mod(nTrials,nConds)==0, 'nTrials must be evenly divisible by nConds.')
-% 
-% % Average within condition for all conditions.
-% CxN = NaN(nConds, nNeurons);
-% for iCond = 1:nConds
-%     CxN(iCond,:) ...
-%         = mean(TxN((iCond-1)*nTrialsPerCond + 1 : iCond*nTrialsPerCond, :));
-% end
-% 
-% end
