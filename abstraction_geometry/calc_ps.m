@@ -171,7 +171,7 @@ parfor iDichot = 1:nDichotomies
         % (averaged over all trials of that condition) in side1 and the
         % i_th condition vector (also averaged over trials) in the current
         % permutation of side2 for all i from 1 to m.
-        codingVecs = CxN(side1,:) - CxN(side2Perms(:,iPerm),:);
+        codingVecs = CxN(side1,:) - CxN(side2Perms(iPerm,:),:);
         
         % Determine all unique ways to pair up the coding vectors for the
         % current permutation, then calculate cosine similarity of all
@@ -202,7 +202,7 @@ nullParScore = NaN(nDichotomies, nvp.nNull);
 
 % Generate distribution of PS scores for each dichotomy by repeating above
 % process 'nNull' times.
-for iNull = 1:nvp.nNull    
+parfor iNull = 1:nvp.nNull    
     
     % Construct null model.
     switch nvp.nullMethod
@@ -246,7 +246,7 @@ for iNull = 1:nvp.nNull
             % vector (averaged over all trials of that condition) in side1
             % and the i_th condition vector (also averaged over trials) in
             % the current permutation of side2.
-            codingVecs = nullCxN(side1,:) - nullCxN(side2Perms(:,iPerm),:);
+            codingVecs = nullCxN(side1,:) - nullCxN(side2Perms(iPerm,:),:);
 
             % Determine all unique ways to pair up the coding vectors for
             % the current permutation, then calculate cosine similarity of
