@@ -29,52 +29,67 @@ function [ccgp,varargout] = test_ccgp(TxN,trialLabels,nvp)
 %                positive integer condition label corresponding to a row
 %                (single trial) of TxN.
 % Name-Value Pairs (nvp)
-%   'condLabels' -- 1 x nConds cell array, where each cell contains the
-%                   name/description of a condition. Defualt is an empty
-%                   array, in which case the optional argument
-%                   dichotomyConds (see RETURNS below) will be returned as
-%                   an empty array.
-%   'dropIdc'    -- 1 x n vector, where each element contains the index of
-%                   neuron within the population that we wish to drop (i.e.
-%                   all its entries across trials are deleted, so that the
-%                   length of the second dimension of TxN overall decreases
-%                   by n) before calculating CCGP. 
-%   'learner'    -- Linear classification model type. Corresponds to
-%                   'Learner' name-value pair in MATLAB's fitclinear.
-%                   Default is 'svm', a linear SVM model.
-%   'pVal'       -- May take on values: 'two-tailed', 'left-tailed',
-%                   'right-tailed', or logical false. If false, null
-%                   distributions for CCGP (accuracy and AUC) will not be
-%                   computed. If one of the above string values, null
-%                   distributions will be computed for CCGP based on both
-%                   accuracy and AUC (see 'nullMethod' below), and p values
-%                   will be calculated accordingly. Default is
-%                   'two-tailed'.
-%   'confInt'    -- Scalar integer specifying the confidence interval size
-%                   (as a percentage) to be calculated around the mean of
-%                   the null distributions. Default = 95.
-%   'nNull'      -- Scalar integer that is the number of synthetic/null
-%                   datasets to generate in order to calculate statistical
-%                   significance of CCGP.
-%   'nullMethod' -- String value indicating the method to be used to
-%                   generate a null dataset, either 'permutation' or
-%                   'geometric'. If 'permutation', the original TxN input
-%                   is shuffled for each neuron independently (i.e.,
-%                   entries of each column vector are shuffled
-%                   independently), then the process of calculating CCGP is
-%                   carried out as on the empirical data. This destroys
-%                   cluster structure to a certain extent (though it will
-%                   completely fail to do so in certain cases) and is
-%                   equivalent to shuffling each neuron's trial labels
-%                   independently (while preserving the marginal
-%                   distribution of each neuron's firing rate across
-%                   trials). If 'geometric', nConds N-vectors are sampled
-%                   from a standard normal distribution and considered
-%                   random cluster centroids, and point clouds
-%                   corresponding to each condition in the empirical data
-%                   are rotated and the moved to the new centroids in
-%                   N-space; see construct_random_geom for more details on
-%                   this process.
+%   'condLabels'     -- 1 x nConds cell array, where each cell contains the
+%                       name/description of a condition. Defualt is an
+%                       empty array, in which case the optional argument
+%                       dichotomyConds (see RETURNS below) will be returned
+%                       as an empty array.
+%   'dropIdc'        -- 1 x n vector, where each element contains the index
+%                       of neuron within the population that we wish to
+%                       drop (i.e. all its entries across trials are
+%                       deleted, so that the length of the second dimension
+%                       of TxN overall decreases by n) before calculating
+%                       CCGP.
+%   'learner'        -- Linear classification model type. Corresponds to
+%                       'Learner' name-value pair in MATLAB's fitclinear.
+%                       Default is 'svm', a linear SVM model.
+%   'pVal'           -- May take on values: 'two-tailed', 'left-tailed',
+%                       'right-tailed', or logical false. If false, null
+%                       distributions for CCGP (accuracy and AUC) will not
+%                       be computed. If one of the above string values,
+%                       null distributions will be computed for CCGP based
+%                       on both accuracy and AUC (see 'nullMethod' below),
+%                       and p values will be calculated accordingly.
+%                       Default is 'two-tailed'.
+%   'confInt'        -- Scalar integer specifying the confidence interval
+%                       size (as a percentage) to be calculated around the
+%                       mean of the null distributions. Default = 95.
+%   'nNull'          -- Scalar integer that is the number of synthetic/null
+%                       datasets to generate in order to calculate
+%                       statistical significance of CCGP.
+%   'nullMethod'     -- String value indicating the method to be used to
+%                       generate a null dataset, either 'permutation' or
+%                       'geometric'. If 'permutation', the original TxN
+%                       input is shuffled for each neuron independently
+%                       (i.e., entries of each column vector are shuffled
+%                       independently), then the process of calculating
+%                       CCGP is carried out as on the empirical data. This
+%                       destroys cluster structure to a certain extent
+%                       (though it will completely fail to do so in certain
+%                       cases) and is equivalent to shuffling each neuron's
+%                       trial labels independently (while preserving the
+%                       marginal distribution of each neuron's firing rate
+%                       across trials). If 'geometric', nConds N-vectors
+%                       are sampled from a standard normal distribution and
+%                       considered random cluster centroids, and point
+%                       clouds corresponding to each condition in the
+%                       empirical data are rotated and the moved to the new
+%                       centroids in N-space; see construct_random_geom for
+%                       more details on this process.
+%   'permute'        -- String value, either 'trialLabels' or 'neurons'. If
+%                       'trialLabels', the permutation null model (see
+%                       'nullMethod' above) is generated by permuting the
+%                       elements of the trialLabels vector but leaving the
+%                       firing rate matrix, TxN, intact. If 'neurons', then
+%                       each the permutation null is generated via
+%                       independently permuting each of the columns of the
+%                       firing rate data matrix, TxN. Note that this
+%                       argument is ignored if 'nullMethod' = 'geometric'.
+%                       Default = 'neurons'.
+%   'returnNullDist' -- (1|0, default = 0). Specify whether or not to
+%                       return the null distributions for accuracy and auc
+%                       (for each dichotomy) in the ccgp struct (see
+%                       RETURNS below).
 %
 % RETURNS
 % -------
@@ -99,6 +114,10 @@ function [ccgp,varargout] = test_ccgp(TxN,trialLabels,nvp)
 %                    number of standard deviations from the mean of the
 %                    null CCGP (accuracy) distribution that the empirical
 %                    CCGP for that dichotomy lies.
+%       .nullDist -- nDichotomies x nNull array (see 'nNull' under
+%                    Name-Value Pair options above) whose i_th j_th element
+%                    is the j_th draw from the null accuracy-based CCGP
+%                    distribution for the i_th dichotomy. 
 %   .auc      -- 1 x 1 struct with the following fields containing CCGP  
 %                information based on AUC metric.
 %       .ccgp     -- nDichotomies x 1 vector whose elements are the decoder
@@ -119,6 +138,10 @@ function [ccgp,varargout] = test_ccgp(TxN,trialLabels,nvp)
 %                    number of standard deviations from the mean of the
 %                    null CCGP (AUC) distribution that the empirical CCGP
 %                    for that dichotomy lies.
+%       .nullDist -- nDichotomies x nNull array (see 'nNull' under
+%                    Name-Value Pair options above) whose i_th j_th element
+%                    is the j_th draw from the null AUC-based CCGP
+%                    distribution for the i_th dichotomy. 
 % dichotomyConds -- An optional returned value, dichtomyConds is an
 %                   nDichotomies x nConds cell array where each row
 %                   corresponds to a dichotomy. For each row (dichotomy),
@@ -129,7 +152,11 @@ function [ccgp,varargout] = test_ccgp(TxN,trialLabels,nvp)
 %                   condLabels is empty (as it is by default), this value,
 %                   if requested, will be returned as an empty array.
 %
-% Author: Jonathan Chien 7/16/21 Version 1.2 Last edit: 8/20/21.
+% Author: Jonathan Chien 7/16/21 Version 1.2 Last edit: 1/11/22.
+% Version History
+%   1/11/22 -- Added an option to allow the user to choose to generate the 
+%              permutation null model by shuffling either the trial labels
+%              or each column of TxN indpendently. 
 
 
 arguments
@@ -142,7 +169,10 @@ arguments
     nvp.confInt (1,1) = 95
     nvp.nNull (1,1) = 2
     nvp.nullMethod string = 'geometric'
+    nvp.permute string = 'neurons'
+    nvp.returnNullDist = false
 end
+
 
 %% Set parameters based on inputs and prepare for decoding runs
 
@@ -221,39 +251,39 @@ parfor iDichot = 1:nDichotomies
         % For current combination (of c combinations), test against c
         % combinations of the same size from the other side.
         for iComb1 = 1:nCombos
-            for iComb2 = 1:nCombos
-                
-                % Get current sets of conditions (drawn from both sides)
-                % that will serve as training set and test set, respectively.
-                trainConds = [trainCombos1(iComb1,:) trainCombos2(iComb2,:)];
-                testConds = [testCombos1(iComb1,:) testCombos2(iComb2,:)];
-                             
-                % Get training labels corresponding to current train set.
-                trainLabels = trialLabels(ismember(trialLabels,trainConds));
-                trainSet = TxN(ismember(trialLabels,trainConds),:);
-                testLabels = trialLabels(ismember(trialLabels,testConds));
-                testSet = TxN(ismember(trialLabels,testConds),:);
-                
-                % Reassign labels to 1 and 0 (instead of condition labels).
-                trainLabels(ismember(trainLabels,side1)) = 1;
-                trainLabels(ismember(trainLabels,side2)) = 0;
-                testLabels(ismember(testLabels,side1)) = 1;
-                testLabels(ismember(testLabels,side2)) = 0;
-                
-                % Fit classifier and test on test data.
-                decoder = fitclinear(trainSet, trainLabels, ...
-                                     'Learner', nvp.learner);
-                [label, scores] = predict(decoder, testSet);  
-                
-                % Calculate accuracy and AUC.
-                iDecoder = iDecoder + 1;
-                currAccuracy(iDecoder) ...
-                    = ((sum(label == 1 & testLabels == 1) ...  
-                       + sum(label == 0 & testLabels == 0))) ...
-                      / (length(testLabels));
-                [~,~,~,currAuc(iDecoder)] = perfcurve(testLabels, ...
-                                                      scores(:,2), 1);                          
-            end
+        for iComb2 = 1:nCombos
+            
+            % Get current sets of conditions (drawn from both sides)
+            % that will serve as training set and test set, respectively.
+            trainConds = [trainCombos1(iComb1,:) trainCombos2(iComb2,:)];
+            testConds = [testCombos1(iComb1,:) testCombos2(iComb2,:)];
+                         
+            % Get training labels corresponding to current train set.
+            trainLabels = trialLabels(ismember(trialLabels,trainConds));
+            trainSet = TxN(ismember(trialLabels,trainConds),:);
+            testLabels = trialLabels(ismember(trialLabels,testConds));
+            testSet = TxN(ismember(trialLabels,testConds),:);
+            
+            % Reassign labels to 1 and 0 (instead of condition labels).
+            trainLabels(ismember(trainLabels,side1)) = 1;
+            trainLabels(ismember(trainLabels,side2)) = 0;
+            testLabels(ismember(testLabels,side1)) = 1;
+            testLabels(ismember(testLabels,side2)) = 0;
+            
+            % Fit classifier and test on test data.
+            decoder = fitclinear(trainSet, trainLabels, ...
+                                 'Learner', nvp.learner);
+            [label, scores] = predict(decoder, testSet);  
+            
+            % Calculate accuracy and AUC.
+            iDecoder = iDecoder + 1;
+            currAccuracy(iDecoder) ...
+                = ((sum(label == 1 & testLabels == 1) ...  
+                   + sum(label == 0 & testLabels == 0))) ...
+                  / (length(testLabels));
+            [~,~,~,currAuc(iDecoder)] = perfcurve(testLabels, ...
+                                                  scores(:,2), 1);                          
+        end
         end
     end
     
@@ -286,20 +316,31 @@ nullAuc = NaN(nDichotomies, nvp.nNull);
 % Iteratively test CCGP on null datasets.
 parfor iNull = 1:nvp.nNull
     
-    % Generate null model.
-    switch nvp.nullMethod
-        case 'permutation'
-            % Independently permute each column (neuron) of TxN. 
+    % Generate null model via permutation.
+    if strcmp(nvp.nullMethod, 'permutation')
+        % Permute trial labels but leave data (TxN) intact.
+        if strcmp(nvp.permute, 'trialLabels')            
+            nullTrialLabels = trialLabels(randperm(nTrials));
+            nullTxN = TxN;
+
+        % Independently permute each column (neuron) of TxN but leave 
+        % trialLabels intact.
+        elseif strcmp(nvp.permute, 'neurons')
             nullTrialLabels = trialLabels;
             nullTxN = NaN(size(TxN));
             for iNeuron = 1:nNeurons
                 nullTxN(:,iNeuron) = TxN(randperm(nTrials),iNeuron);
             end
-            
-        case 'geometric'
-            % Retain trial labels and obtain null geometric model.
-            nullTrialLabels = trialLabels;
-            nullTxN = construct_random_geom(TxN, nConds, 'addNoise', true);     
+        end
+     
+    % Generate null model via geometric model. % Retain trial labels and
+    % obtain null geometric model.
+    elseif strcmp(nvp.nullMethod, 'geometric')        
+        nullTrialLabels = trialLabels;
+        nullTxN = construct_random_geom(TxN, nConds, 'addNoise', true); 
+        
+    else
+        error("Invalid value for 'nullMethod'.")
     end
     
     % Preallocate matrices to hold all values across all dichotomies and
@@ -344,39 +385,39 @@ parfor iNull = 1:nvp.nNull
             % For current combination (of p combinations), test against p
             % combinations of the same size from the other side.
             for iComb1 = 1:nCombos
-                for iComb2 = 1:nCombos
+            for iComb2 = 1:nCombos
 
-                    % Get current sets of conditions (drawn from both sides)
-                    % that will serve as training set and test set, respectively.
-                    trainConds = [trainCombos1(iComb1,:) trainCombos2(iComb2,:)];
-                    testConds = [testCombos1(iComb1,:) testCombos2(iComb2,:)];
+                % Get current sets of conditions (drawn from both sides)
+                % that will serve as training set and test set, respectively.
+                trainConds = [trainCombos1(iComb1,:) trainCombos2(iComb2,:)];
+                testConds = [testCombos1(iComb1,:) testCombos2(iComb2,:)];
 
-                    % Get training labels corresponding to current train set.
-                    trainLabels = nullTrialLabels(ismember(nullTrialLabels,trainConds));
-                    trainSet = nullTxN(ismember(nullTrialLabels,trainConds),:);
-                    testLabels = nullTrialLabels(ismember(nullTrialLabels,testConds));
-                    testSet = nullTxN(ismember(nullTrialLabels,testConds),:);
+                % Get training labels corresponding to current train set.
+                trainLabels = nullTrialLabels(ismember(nullTrialLabels,trainConds));
+                trainSet = nullTxN(ismember(nullTrialLabels,trainConds),:);
+                testLabels = nullTrialLabels(ismember(nullTrialLabels,testConds));
+                testSet = nullTxN(ismember(nullTrialLabels,testConds),:);
 
-                    % Reassign labels to 1 and 0 (instead of condition labels).
-                    trainLabels(ismember(trainLabels,side1)) = 1;
-                    trainLabels(ismember(trainLabels,side2)) = 0;
-                    testLabels(ismember(testLabels,side1)) = 1;
-                    testLabels(ismember(testLabels,side2)) = 0;
+                % Reassign labels to 1 and 0 (instead of condition labels).
+                trainLabels(ismember(trainLabels,side1)) = 1;
+                trainLabels(ismember(trainLabels,side2)) = 0;
+                testLabels(ismember(testLabels,side1)) = 1;
+                testLabels(ismember(testLabels,side2)) = 0;
 
-                    % Fit classifier and test on test data.
-                    decoder = fitclinear(trainSet, trainLabels, ...
-                                         'Learner', nvp.learner);
-                    [label, scores] = predict(decoder, testSet);  
+                % Fit classifier and test on test data.
+                decoder = fitclinear(trainSet, trainLabels, ...
+                                     'Learner', nvp.learner);
+                [label, scores] = predict(decoder, testSet);  
 
-                    % Calculate accuracy and AUC.
-                    iDecoder = iDecoder + 1;
-                    currNullAccuracy(iDichot,iDecoder) ...
-                        = ((sum(label == 1 & testLabels == 1) ...  
-                           + sum(label == 0 & testLabels == 0))) ...
-                          / (length(testLabels));
-                    [~,~,~,currNullAuc(iDichot,iDecoder)] ...
-                        = perfcurve(testLabels, scores(:,2), 1);   
-                end
+                % Calculate accuracy and AUC.
+                iDecoder = iDecoder + 1;
+                currNullAccuracy(iDichot,iDecoder) ...
+                    = ((sum(label == 1 & testLabels == 1) ...  
+                       + sum(label == 0 & testLabels == 0))) ...
+                      / (length(testLabels));
+                [~,~,~,currNullAuc(iDichot,iDecoder)] ...
+                    = perfcurve(testLabels, scores(:,2), 1);   
+            end
             end
         end
     end
@@ -384,6 +425,12 @@ parfor iNull = 1:nvp.nNull
     % Average over decoders and store results from current null run.
     nullAccuracy(:,iNull) = mean(currNullAccuracy, 2);
     nullAuc(:,iNull) = mean(currNullAuc, 2);
+end
+
+% Option to return null distribution (for each dichotomy individually).
+if nvp.returnNullDist
+    ccgp.accuracy.nullDist = nullAccuracy;
+    ccgp.auc.nullDist = nullAuc;
 end
 
 
