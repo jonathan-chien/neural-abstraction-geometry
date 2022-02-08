@@ -1,6 +1,13 @@
 function p = tail_prob(observed,null,nvp)
 % Calculates the tail probability for an observation or set of observations
-% under a null distribution or set of null distributions. 
+% under a null distribution or set of null distributions. Note that for the
+% two-sided case, at least one source (An Introduction to Probability and
+% Statistics, Second Edition, Rohatgi & Saleh) takes p values to be poorly
+% defined for asymmetric null distributions, though this source states that
+% doubling of the smaller tail is usually recommended by many authors in
+% that case (also seems to be slightly more conservative than the absolute
+% value method). Doubling may also perhaps be interpreted as a correction
+% for two one-tailed tests.
 %
 % PARAMETERS
 % ----------
@@ -55,32 +62,26 @@ end
 
 %% Calculate p value(s)
 
-% Calculate tail probability of observed under null distribution with
-% desired sidedness. Note that at least one source (An Introduction to
-% Probability and Statistics, Second Edition, Rohatgi & Saleh) takes p
-% values to be poorly defined for asymmetric null distributions, though
-% this source states that doubling of the smaller tail is usually
-% recommended by many authors in that case (also seems to be slightly more
-% conservative than the absolute value method). Doubling may also perhaps
-% be interpreted as a correction for two one-tailed tests.
-switch nvp.type
-    case 'two-tailed'
-        if ~nvp.exact 
-            % Calculate both right and left tails with correction for
-            % random permutations.
-            rightTail = (sum(observed >= null, 2) + 1) / (nullDistrSize + 1);
-            leftTail = (sum(observed <= null, 2) + 1) / (nullDistrSize + 1);
-                    
-        elseif nvp.exact
-            % Calculate both right and left tails without correction, if
-            % exact permutations used.
-            rightTail = sum(observed >= null, 2) / nullDistrSize; 
-            leftTail = sum(observed <= null, 2) / nullDistrSize;
+% Calculate both right and left tails first. 
+if ~nvp.exact 
+    % Calculate both right and left tails with correction for
+    % random permutations.
+    rightTail = (sum(observed <= null, 2) + 1) / (nullDistrSize + 1);
+    leftTail = (sum(observed >= null, 2) + 1) / (nullDistrSize + 1);
             
-        else
-            error("Invalid value for 'exact'.")
-        end
-        
+elseif nvp.exact
+    % Calculate both right and left tails without correction, if
+    % exact permutations used.
+    rightTail = mean(observed <= null, 2);
+    leftTail = mean(observed >= null, 2);
+    
+else
+    error("Invalid value for 'exact'.")
+end
+
+% Apply desired sidedness.
+switch nvp.type
+    case 'two-tailed'    
         % Double tails for all distributions and preallocate p.
         rightTailDoubled = rightTail*2;
         leftTailDoubled = leftTail*2;
@@ -94,22 +95,13 @@ switch nvp.type
         p(rightTail == leftTail) = ones(sum(rightTail==leftTail), 1); 
         
     case 'right-tailed'
-        if ~nvp.exact
-            p = (sum(observed >= null, 2) + 1) / (nullDistrSize + 1);
-        elseif nvp.exact
-            p = mean(observed >= null, 2);
-        else
-            error("Invalid value for 'exact'.")
-        end
+        p = rightTail;
         
     case 'left-tailed'
-        if ~nvp.exact
-            p = (sum(observed <= null, 2) + 1) / (nullDistrSize + 1);
-        elseif nvp.exact
-            p = mean(observed <= null, 2);
-        else
-            error("Invalid value for 'exact'.")
-        end
+        p = leftTail;
+
+    otherwise
+        error("Invalid value for 'type'.")
 end
 
 end
